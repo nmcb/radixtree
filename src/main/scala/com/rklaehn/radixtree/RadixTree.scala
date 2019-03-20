@@ -2,6 +2,8 @@ package com.rklaehn.radixtree
 
 import algebra.ring.{AdditiveMonoid, AdditiveSemigroup}
 import algebra.{Order, Monoid, Eq}
+import cats.Show
+import cats.kernel.Hash
 import com.rklaehn.radixtree.RadixTree.Key
 import com.rklaehn.sonicreducer.Reducer
 
@@ -9,7 +11,6 @@ import scala.annotation.tailrec
 import scala.collection.AbstractTraversable
 import scala.reflect.ClassTag
 import scala.util.hashing.MurmurHash3
-import cats.Show
 
 final class RadixTree[K, V](val prefix: K, private[radixtree] val children: Array[RadixTree[K, V]], private[radixtree] val valueOpt: Opt[V]) extends NoEquals {
 
@@ -49,7 +50,15 @@ final class RadixTree[K, V](val prefix: K, private[radixtree] val children: Arra
   def filterPrefix(prefix: K)(implicit K: Key[K]): RadixTree[K, V] =
     filterPrefix0(prefix, 0)
 
-  def subtreeWithPrefix(prefix: K)(implicit K: Key[K]) = {
+  def filterPrefixesOf(query: K)(implicit K: Key[K]): RadixTree[K, V] = {
+    val ft = filterPrefixesOf0(this, query, 0)
+    if (ft.prefix == K.empty)
+      if (! ft.children.isEmpty) ft.children.head
+      else RadixTree.empty
+    else ft
+  }
+
+  def subtreeWithPrefix(prefix: K)(implicit K: Key[K]): RadixTree[K, V] = {
     val tree1 = filterPrefix(prefix)
     if (K.startsWith(tree1.prefix, prefix, 0))
       tree1.copy(prefix = K.slice(tree1.prefix, K.size(prefix), K.size(tree1.prefix)))
@@ -120,6 +129,27 @@ final class RadixTree[K, V](val prefix: K, private[radixtree] val children: Arra
       }
     } else
       RadixTree.empty
+  }
+
+  private def filterPrefixesOf0(acc: RadixTree[K, V], query: K, offset: Int)(implicit K: Key[K]): RadixTree[K, V] = {
+    val ps = K.size(prefix)
+    val qs = K.size(query) - offset
+    val maxFd = ps min qs
+    val fd = K.indexOfFirstDifference(prefix, 0, query, offset, maxFd)
+    if (fd == maxFd) {
+      if (maxFd < ps) RadixTree.empty
+      else if (qs == ps) copy(children = RadixTree.emptyChildren)
+      else {
+        val index = K.binarySearch(children, query, offset + ps)
+        if (index >= 0) {
+          val child1 = children(index).filterPrefixesOf0(this, query, offset + ps)
+          val children1 = if (child1.isEmpty) RadixTree.emptyChildren[K, V] else Array(child1)
+          copy(children = children1)
+        } else {
+          copy(children = RadixTree.emptyChildren)
+        }
+      }
+    } else RadixTree.empty
   }
 
   def modifyOrRemove(f: (K, V, Int) => Option[V])(implicit K: Key[K]): RadixTree[K, V] =
@@ -199,6 +229,13 @@ final class RadixTree[K, V](val prefix: K, private[radixtree] val children: Arra
   def contains(key: K)(implicit K: Key[K]) = get0(key, 0).isDefined
 
   def get(key: K)(implicit K: Key[K]): Option[V] = get0(key, 0).toOption
+
+  def getOrNull(key: K)(implicit K: Key[K]): V = get0(key, 0).ref
+
+  def getOrDefault[VV >: V](key: K, default: VV)(implicit K: Key[K]): VV = {
+    val o = get0(key, 0)
+    if (o.isDefined) o.get else default
+  }
 
   @tailrec
   private def get0(key: K, offset: Int)(implicit K: Key[K]): Opt[V] =
@@ -357,7 +394,7 @@ object RadixTree {
     val reducer = Reducer[RadixTree[K, V]](_ merge _)
     for ((k, v) <- kvs)
       reducer.apply(singleton(k, v))
-    reducer.result().getOrElse(empty[K, V])
+    reducer.resultOrElse(empty[K, V])
   }
 
   private def emptyChildren[K, V]: Array[RadixTree[K, V]] = _emptyChildren.asInstanceOf[Array[RadixTree[K, V]]]

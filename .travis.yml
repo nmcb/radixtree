@@ -1,9 +1,10 @@
 sudo: false
 language: scala
+dist: trusty
 scala:
-  - "2.11.7"
+  - "2.12.6"
 script:
-  - sbt clean coverage coreJVM/test
+  - sbt clean coverage coreJVM/test coverageReport
 after_success:
   - pip install --user codecov && codecov
 branches:
@@ -12,3 +13,5 @@ branches:
 cache:
   directories:
     $HOME/.ivy2/cache
+jdk:
+  - openjdk8

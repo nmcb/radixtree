@@ -2,16 +2,15 @@ import ReleaseTransformations._
 
 lazy val commonSettings = Seq(
   organization := "com.rklaehn",
-  scalaVersion := "2.11.7",
-  crossScalaVersions := Seq("2.10.5", "2.11.7"),
+  scalaVersion := "2.12.6",
+  crossScalaVersions := Seq("2.11.12", "2.12.6"),
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scalaVersion.value % "provided",
-    "com.rklaehn" %%% "sonicreducer" % "0.2.0",
-    "org.spire-math" %%% "cats" % "0.3.0",
-    "org.spire-math" %%% "algebra" % "0.3.1",
-    "org.scalatest" %%% "scalatest" % "3.0.0-M7" % "test",
-    "org.spire-math" %%% "algebra-laws" % "0.3.1" % "test",
-    "org.spire-math" %%% "algebra-std" % "0.3.1" % "test",
+    "com.rklaehn" %%% "sonicreducer" % "0.5.0",
+    "org.typelevel" %%% "cats-core" % "1.0.1",
+    "org.typelevel" %%% "algebra" % "1.0.0",
+    "org.typelevel" %%% "algebra-laws" % "1.0.0" % "test",
+    "org.scalatest" %%% "scalatest" % "3.0.1" % "test",
 
     // thyme
     "ichi.bench" % "thyme" % "0.1.1" % "test" from "https://github.com/Ichoran/thyme/raw/9ff531411e10c698855ade2e5bde77791dd0869a/Thyme.jar"
@@ -30,10 +29,11 @@ lazy val commonSettings = Seq(
   releasePublishArtifactsAction := PgpKeys.publishSigned.value,
   publishMavenStyle := true,
   publishArtifact in Test := false,
+  publishTo := sonatypePublishTo.value,
   pomIncludeRepository := Function.const(false),
-  publishTo <<= version { v =>
+  publishTo := {
     val nexus = "https://oss.sonatype.org/"
-    if (v.trim.endsWith("SNAPSHOT"))
+    if (version.value.trim.endsWith("SNAPSHOT"))
       Some("Snapshots" at nexus + "content/repositories/snapshots")
     else
       Some("Releases" at nexus + "service/local/staging/deploy/maven2")
@@ -93,7 +93,7 @@ lazy val instrumentedTestSettings = {
     s"-javaagent:$jammJar"
   }
   Seq(
-    javaOptions in Test <+= (dependencyClasspath in Test).map(makeAgentOptions),
+    javaOptions in Test += makeAgentOptions((dependencyClasspath in Test).value),
       libraryDependencies += "com.github.jbellis" % "jamm" % "0.3.0" % "test",
       fork := true
     )

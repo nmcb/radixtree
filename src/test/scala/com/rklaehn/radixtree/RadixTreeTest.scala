@@ -1,9 +1,18 @@
 package com.rklaehn.radixtree
 
-import algebra.ring.AdditiveMonoid
-import org.scalatest.FunSuite
 import algebra.{Monoid, Eq}
-import algebra.std.all._
+import algebra.instances.array.arrayEq
+import algebra.instances.byte._
+import algebra.instances.char._
+import algebra.instances.int._
+import algebra.instances.short._
+import algebra.instances.string._
+import algebra.instances.tuple._
+import algebra.instances.unit._
+import algebra.ring.AdditiveMonoid
+import cats.kernel.Hash
+import org.scalatest.FunSuite
+
 import Instances._
 
 class RadixTreeTest extends FunSuite {
@@ -163,6 +172,12 @@ class RadixTreeTest extends FunSuite {
     assert(RadixTree("1" -> 1, "12" -> 12).filterPrefix("123").isEmpty)
   }
 
+  test("filterPrefixesOf") {
+    assert(RadixTree("1" -> 1).entries.toSeq === tree.filterPrefixesOf("1x").entries.toSeq)
+    assert(RadixTree("1" -> 1).filterPrefixesOf("foo").isEmpty)
+    assert(RadixTree("1" -> 1, "12" -> 12).filterPrefixesOf("2").isEmpty)
+  }
+
   test("modifyOrRemove") {
     val tree1 = tree.modifyOrRemove { case (k, v, _) => Some(v * 2) }
     val tree2 = tree.modifyOrRemove { case (k, v, _) => None }
@@ -220,6 +235,18 @@ class RadixTreeTest extends FunSuite {
     }
     assert(Opt.empty[Int].toOption.isEmpty)
     assert(Opt.empty[Int].toString === "Opt.empty")
+  }
+
+  test("getOrNull") {
+    val t = RadixTree.singleton("ab", "x")
+    assert(t.getOrNull("ab") == "x")
+    assert(t.getOrNull("ba") eq null)
+  }
+
+  test("getOrDefault") {
+    val t = RadixTree.singleton("ab", 3)
+    assert(t.getOrDefault("ab", 7) == 3)
+    assert(t.getOrDefault("ba", 7) == 7)
   }
 
   test("eq") {
